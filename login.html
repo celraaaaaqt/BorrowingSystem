@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>HTML</title>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="Loginform">
+   <h1 id="title"> Welcome to admin panel! </h1>
+   
+   <br>
+   <form id="Logg">
+     <label for="username">Username:<br> </label>
+   <input type="text" id="username" name="username" placeholder="Enter Username" required><br>
+   <br>
+   <label for="password">Password:<br></label>
+   <input type="password" id="password" name="password" placeholder="Enter Password" required> 
+   <input type="checkbox" id="showpass" onclick="showPass()">
+   <label for="showpass"> Show Password </label>
+   <br>
+   <button id="submit" type="submit"> Login </button>
+    <p id="errorMessage" class="error-message"> </p>
+    <br>
+    <p> Don't have an account?<a href="register.html">Register here </a></p>
+<script src="login.js"> </script>
+</body>
+</html>

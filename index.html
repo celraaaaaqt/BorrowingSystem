@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>School Equipment Borrowing System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="menu-btn" onclick="toggleMenu()">
+<i class="fa-solid fa-bars"></i>
+</div>
+
+<div class="sidebar" id="sidebar">
+<h2><i class="fa-solid fa-school"></i> KNHS</h2>
+<ul>
+<li onclick="scrollToSection('dashboard')"><i class="fa-solid fa-chart-line"></i> Dashboard</li>
+<li onclick="scrollToSection('equipment')"><i class="fa-solid fa-box"></i> Equipment</li>
+<li onclick="scrollToSection('borrow')"><i class="fa-solid fa-hand-holding"></i> Borrow</li>
+<li onclick="scrollToSection('history')"><i class="fa-solid fa-clock-rotate-left"></i> History</li>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<i class="fa-solid fa-right-from-bracket"><button style="background:rgba(0,0,0,0.4);
+backdrop-filter:blur(10px); padding: 30px; font-weight: bold; font-size: 1.1em; background-color: transparent;" class ="logout" id="logout" type="button"> Logout </button> </i>
+</ul>
+</div>
+
+<div class="main">
+
+<!-- DASHBOARD -->
+<div class="card" id="dashboard">
+<h3>Dashboard</h3>
+<p>Today's Transactions: <span id="todayCount">0</span></p>
+<p>Overdue Items: <span id="overdueCount">0</span></p>
+</div>
+
+<!--EQUIPMENTS-->
+<div class="card" id="equipment">
+<h2>EQUIPMENT MANAGEMENT</h2>
+<hr>
+<br>
+
+
+<input type="text" class="searchEquipments" id="eqSearch" placeholder="Search equipment..." onkeyup="searchEquipment()">
+<select class="sort" id="sortEquipment" onchange="sortEquipmentList()">
+<option value="">Sort By</option>
+<option value="name">Name</option>
+<option value="qty">Quantity</option>
+</select>
+
+<p style="margin-top: 5px;"> <b>Equipment Name: </b></p>
+<input type="text" id="eqName" placeholder="Enter Equipment Name...">
+
+<p style="margin-top: 5px;"> <b>Category: </b></p>
+<select id="eqCategory">
+<option value="">Select Category</option>
+<option value="SPORTS">SPORTS</option>
+<option value="ICT EQUIPMENTS">ICT EQUIPMENTS</option>
+</select>
+
+<p style="margin-top: 5px;"> <b>Condition: </b></p>
+<select id="eqDesc">
+  <option value="">Select Condition</option>
+  <option value="GOOD">GOOD</option>
+  <option value="BAD">BAD</option>
+</select>
+
+<p style="margin-top: 5px;"> <b>Quantity: </b></p>
+<input type="number" id="eqQty" placeholder="Enter Quantity...">
+
+<button class="primary" id="addBtn" onclick="addEquipment()">
+<i class="fa-solid fa-plus"></i> Add Equipment
+</button>
+
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Category</th>
+<th>Description</th>
+<th>Qty</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="equipmentTable"></tbody>
+</table>
+</div>
+</div>
+
+<!-- BORROW -->
+<div class="card" id="borrow">
+<h2>BORROW EQUIPMENT</h2>
+<hr>
+<br>
+
+<p style="margin-top: 5px"> <b>Student Number: </b></p>
+<input type="text" id="studentNumber" placeholder="Enter student Number...">
+
+<p style="margin-top: 5px"> <b>Borrower Name: </b></p>
+<input type="text" id="borrowerName" placeholder="Enter Borrower Name...">
+
+<p style="margin-top: 5px"> <b>Contact Number: </b> </p>
+<input type="text" id="contactNumber" placeholder="Enter Contact Number...">
+
+<p style="margin-top: 5px"> <b>Due Date: </b> </p>
+
+<input type="date" id="dueDate">
+
+<p style="margin-top: 5px"> <b>Equipment to Borrow: </b> </p>
+<select id="borrowEquipment"></select>
+
+<p style="margin-top: 5px"> <b>Quantity: </b> </p>
+<input type="number" id="borrowQty" placeholder="Qty (Max 3)">
+
+<button class="primary" onclick="previewTransaction()">
+<i class="fa-solid fa-eye"></i> Preview
+</button>
+
+<div id="previewArea"></div>
+</div>
+
+<!-- HISTORY -->
+<div class="card" id="history">
+<h2>BORROWING HISTORY</h2>
+<hr>
+<br>
+
+<input type="text" class="searchHist" id="historySearch" placeholder="Search history..." onkeyup="searchHistory()">
+
+<select id="sortHistory" onchange="sortHistoryList()">
+<option value="">Sort By</option>
+<option value="name">Name</option>
+<option value="qty">Quantity</option>
+<option value="date">Date</option>
+</select>
+
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Student #</th>
+<th>Name</th>
+<th>Contact</th>
+<th>Equipment</th>
+<th>Qty</th>
+<th>Date</th>
+<th>Due</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="historyTable"></tbody>
+</table>
+</div>
+</div>
+
+<footer>
+© 2026 Kalayaan National High School | Equipment Borrowing System
+</footer>
+
+</div>
+
+<script src="main.js"> </script>
+
+</body>
+</html>

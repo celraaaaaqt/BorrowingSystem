@@ -1,0 +1,95 @@
+body {
+  display: flex;
+  background: linear-gradient(to right, #1e3a8a, #2563eb);
+  min-height: 100vh;
+  color: white;
+}
+h1{
+  font-family: 'Font Name', sans-serif;
+  font-weight: bold;
+  margin-top: 10px;
+  margin-bottom: 100px;
+}
+.Loginform{
+    
+  background: linear-gradient(to right, #1e3a8a, #2563eb);
+    
+    padding: 100px;
+    padding-bottom: 40px;
+    border-radius: 150px;
+    height: 800px;
+    width: 640px;
+    position: absolute;
+    top: 400px;
+    bottom: 500px;
+    left: 60px;
+    font-size: 1.5em;
+    color: white;
+    border:  5px solid white;
+}
+a {
+  text-decoration: none;
+  color: cadetblue;
+}
+#username{
+height: 55px;
+font-size: 0.9em;
+width: 650px;
+border-bottom: 1px solid white;
+background: linear-gradient(to right, #1e3a8a, #2563eb);
+border-top: none;
+border-left: none;
+border-right: none;
+margin-top: 12px;
+outline: none;
+padding-bottom: 1px;
+color: white;
+}
+#password{
+  height: 55px;
+  font-size: 0.9em;
+  width: 650px;
+  border-bottom: 1px solid white;
+  color: white;
+  background: linear-gradient(to right, #1e3a8a, #2563eb);
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  margin-top: 12px;
+  margin-bottom: 5px;
+  outline: none;
+  padding-bottom: 1px;
+  color: white;
+}
+input::placeholder {
+  color: white;
+  opacity: 1;
+}
+#submit{
+  height: 60px;
+  width: 100px;
+  background: #2563eb;
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+  margin-left: 270px;
+  margin-top: 20px;
+  border-radius: 12px;
+}
+#submit:hover{
+  background-color: black;
+  color: white;
+}
+#errorMessage{
+  color: orangered;
+  font-size: 20px;
+}
+#audio {
+  height: 50px;
+  width:80px;
+}
+#audio:hover{
+  background-color: black;
+  color: white;
+  border: none;
+}
