@@ -353,6 +353,30 @@ function previewTransaction(){
     return;
   }
 
+let currentBorrowed = getBorrowedCount(studentNumber.value, contactNumber.value);
+
+
+// total items trying to borrow now
+let newItemsCount = borrowItemsList.reduce((sum, item) => sum + item.qty, 0);
+
+if (currentBorrowed >= 3) {
+  Swal.fire({
+    icon: 'warning',
+    title: `This borrower already has ${currentBorrowed} items (max is 3).`,
+    text: 'Cannot borrow more until items are returned.'
+  });
+  return;
+}
+
+if (currentBorrowed + newItemsCount > 3) {
+  Swal.fire({
+    icon: 'warning',
+    title: `Limit exceeded`,
+    text: `Borrower already has ${currentBorrowed}. You can only add ${3 - currentBorrowed} more item(s).`
+  });
+  return;
+}
+
   // Build preview HTML
   let itemsHtml = borrowItemsList.map(item => {
     let eq = equipment[item.index];
@@ -411,7 +435,7 @@ function confirmBorrow(index, qty) {
         return;
       }
       
-      // Check if the student already borrowed this equipment and it's still Borrowed
+      //Check if the student already borrowed this equipment and it's still Borrowed
       let existing = history.find(
         h =>
         h.student === studentNumber.value &&
@@ -491,16 +515,27 @@ function renderHistory() {
   
   // Group history by student + date + contact
   let grouped = {};
-  
   history.forEach(h => {
     let key = `${h.student}_${h.date}_${h.contact}`; // unique transaction
     if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(h); // push each item
+    grouped[key].push(h);
   });
   
   Object.values(grouped).forEach(group => {
+    // Determine overall status
+    let allStatuses = group.map(h => {
+      if (h.items) return h.items.map(i => i.status || "Borrowed");
+      return [h.status || "Borrowed"];
+    }).flat();
+    
+    let overallStatus;
+    if (allStatuses.every(s => s === "Returned")) overallStatus = "Returned";
+    else if (allStatuses.every(s => s === "Reported")) overallStatus = "Reported";
+    else if (allStatuses.includes("Borrowed")) overallStatus = "Borrowed";
+    else overallStatus = "Partial";
+    
     let first = group[0];
-    let overdue = (first.status === "Borrowed" && new Date(first.due) < new Date()) ? "overdue" : "";
+    let overdue = (overallStatus === "Borrowed" && new Date(first.due) < new Date()) ? "overdue" : "";
     
     // equipment list
     let equipmentList = first.items ?
@@ -521,9 +556,9 @@ function renderHistory() {
         <td>${totalQty}</td>
         <td>${first.date}</td>
         <td>${first.due}</td>
-        <td>${first.status}</td>
+        <td>${overallStatus}</td>
         <td>
-          ${first.status === "Borrowed" ? `
+          ${overallStatus === "Borrowed" || overallStatus === "Partial" ? `
           <button class="success" onclick="markReturnedGroup('${first.student}', '${first.date}', '${first.contact}')">
             <i class="fa-solid fa-rotate-left"></i>
           </button>
@@ -579,7 +614,15 @@ function markReturnedGroup(student, date, contact) {
 function updateDashboard(){
 let today=new Date().toISOString().split("T")[0];
 
-todayCount.innerText=history.filter(h=>h.date===today).length;
+let uniqueTransactions = [
+  ...new Set(
+    history
+    .filter(h => h.date === today)
+    .map(h => `${h.student}_${h.date}_${h.contact}`)
+  )
+];
+
+todayCount.innerText = uniqueTransactions.length;
 
 overdueCount.innerText=history.filter(h=>h.status==="Borrowed"&&new Date(h.due)<new Date()).length;
 
@@ -753,28 +796,25 @@ function clearBorrowFields(){
 }
 
 function reportItemGroup(student, date, contact) {
-  // Get all history entries for this transaction
+  // Get all Borrowed history entries for this transaction
   let entries = history.filter(h =>
     h.student === student &&
     h.date === date &&
     h.contact === contact &&
-    h.status === "Borrowed"
+    (h.status === "Borrowed" || (h.items && h.items.some(it => !it.status || it.status === "Borrowed")))
   );
-  
+
   if (entries.length === 0) {
     Swal.fire({ icon: 'info', title: 'No items to report' });
     return;
   }
-  
-  // Flatten all items uniquely
+
+  // Flatten all items for multi-item borrows
   let flatItems = [];
-  let seen = new Set();
-  
   entries.forEach(h => {
     if (h.items && h.items.length > 0) {
       h.items.forEach(item => {
-        let key = `${item.name}_${item.qty}`;
-        if (!seen.has(key)) {
+        if (!item.status || item.status === "Borrowed") {
           flatItems.push({
             student: h.student,
             name: h.name,
@@ -782,21 +822,24 @@ function reportItemGroup(student, date, contact) {
             equipment: item.name,
             qty: item.qty,
             date: h.date,
-            entry: h
+            entry: h,
           });
-          seen.add(key);
         }
       });
-    } else {
-      let key = `${h.equipment}_${h.qty}`;
-      if (!seen.has(key)) {
-        flatItems.push(h);
-        seen.add(key);
-      }
+    } else if (h.status === "Borrowed") {
+      flatItems.push({
+        student: h.student,
+        name: h.name,
+        contact: h.contact,
+        equipment: h.equipment,
+        qty: h.qty,
+        date: h.date,
+        entry: h,
+      });
     }
   });
-  
-  // Build HTML for each item
+
+  // Build HTML for Swal
   let html = '<div style="text-align:left">';
   flatItems.forEach((h, i) => {
     html += `
@@ -814,7 +857,7 @@ function reportItemGroup(student, date, contact) {
     `;
   });
   html += '</div>';
-  
+
   Swal.fire({
     title: 'Report Issues',
     html: html,
@@ -826,75 +869,78 @@ function reportItemGroup(student, date, contact) {
       for (let i = 0; i < flatItems.length; i++) {
         let type = document.getElementById(`reportType${i}`).value;
         let note = document.getElementById(`reportNote${i}`).value;
-        if (type) {
-          result.push({ itemIndex: i, type, note });
-        }
+        result.push({ itemIndex: i, type, note });
       }
       return result;
     }
   }).then((res) => {
-    if (res.isConfirmed) {
-      let reported = res.value;
-      if (reported.length === 0) {
-        Swal.fire({ icon: 'info', title: 'No items selected for reporting' });
-        return;
-      }
-      
-      reported.forEach(r => {
-        let h = flatItems[r.itemIndex];
-        
-        reports.push({
-          student: h.student,
-          name: h.name,
-          equipment: h.equipment,
-          qty: h.qty,
-          type: r.type,
-          note: r.note,
-          date: new Date().toISOString().split("T")[0]
-        });
-        
-        // mark as reported in history
-        let histIndex = history.findIndex(x =>
-          x.student === h.student &&
-          x.date === h.date &&
-          ((x.equipment === h.equipment) || (x.items && x.items.some(it => it.name === h.equipment))) &&
-          x.contact === h.contact &&
-          x.status === "Borrowed"
-        );
-        if (histIndex !== -1) {
-          history[histIndex].status = "Reported";
-        }
-      });
-      
-      Swal.fire({
-        icon: 'success',
-        title: 'Report submitted!',
-        timer: 2000,
-        showConfirmButton: false
-      });
-      
-      saveData();
-      renderHistory();
-      renderReports();
-    }
-  });
-}function renderReports(){
-let table = document.getElementById("reportTable");
-if(!table) return;
+    if (!res.isConfirmed) return;
 
-reports.forEach(r=>{
-table.innerHTML += `
-<tr>
-<td>${r.student}</td>
-<td>${r.name}</td>
-<td>${r.equipment}</td>
-<td>${r.qty}</td>
-<td><span class="badge danger">${r.type}</span></td>
-<td>${r.note || "-"}</td>
-<td>${r.date}</td>
-</tr>`;
-});
+    let reported = res.value;
+
+    reported.forEach(r => {
+      let h = flatItems[r.itemIndex];
+      let histEntry = h.entry;
+
+      // Update the actual history entry/item
+      if (histEntry.items && histEntry.items.length > 0) {
+        histEntry.items.forEach(item => {
+          if (item.name === h.equipment) {
+            item.status = r.type ? "Reported" : "Returned";
+          }
+        });
+      } else {
+        histEntry.status = r.type ? "Reported" : "Returned";
+      }
+
+      // Push to reports
+      reports.push({
+        student: h.student,
+        name: h.name,
+        equipment: h.equipment,
+        qty: h.qty,
+        type: r.type || "Returned",
+        note: r.note || "-",
+        date: new Date().toISOString().split("T")[0],
+        badgeClass: r.type ? "danger" : "success"
+      });
+    });
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Report submitted!',
+      timer: 2000,
+      showConfirmButton: false
+    });
+
+    saveData();       // Save to localStorage
+    renderHistory();  // Refresh history table
+    renderReports();  // Refresh report table
+    renderChart();    // Update chart
+  });
 }
+
+function renderReports() {
+  let table = document.getElementById("reportTable");
+  let html = ""; // build all rows first
+
+  reports.forEach(r => {
+    html += `
+      <tr>
+        <td>${r.student}</td>
+        <td>${r.name}</td>
+        <td>${r.equipment}</td>
+        <td>${r.qty}</td>
+        <td><span class="badge ${r.badgeClass}">${r.type}</span></td>
+        <td>${r.note}</td>
+        <td>${r.date}</td>
+      </tr>
+    `;
+  });
+
+  table.innerHTML = html; // assign once
+}
+
 function searchReports(){
 let search = document.getElementById("reportSearch").value.toLowerCase();
 let table = document.getElementById("reportTable");
@@ -922,7 +968,7 @@ table.innerHTML += `
 let borrowItemsList = []; // stores { index, qty }
 
 function addBorrowItem() {
-  let index = borrowEquipment.value;
+  let index = Number(borrowEquipment.value);
   let qty = parseInt(borrowQty.value);
   
   if (index === "" || isNaN(qty) || qty <= 0) {
@@ -965,7 +1011,10 @@ function addBorrowItem() {
   }).then((result) => {
     if (result.isConfirmed) {
       // add to borrow list
-      borrowItemsList.push({ index, qty });
+      borrowItemsList.push({
+  index: Number(index),
+  qty: Number(qty)
+});
       renderBorrowItems();
       
       Swal.fire({
@@ -988,7 +1037,13 @@ function renderBorrowItems() {
   borrowItemsList.forEach((item, i) => {
     let eq = equipment[item.index];
     container.innerHTML += `
-      <div class="borrow-item">
+      <div style="padding: 8px;
+background: linear-gradient(to right, #1e3a8a, #2563eb);
+color: #fff;
+font - size: 14px;
+border-radius: 10px;
+box-shadow: 0-2px 10 px rgba(0, 0, 0, 0.3); border-top: 8px solid;
+  border-top-color: #f59e0b; margin-bottom: 3px;"class="borrow-item">
         <span>${eq.name} (Qty: ${item.qty})</span>
         
         <button style="background-color: blue; margin-right:5px;" type="button" onclick="editBorrowItem(${i})">Edit</button>
@@ -1005,18 +1060,25 @@ function renderBorrowItems() {
 function editBorrowItem(i) {
   let item = borrowItemsList[i];
   
+  // ✅ Build dropdown (FILTERED, not disabled)
   let equipmentOptions = equipment.map((eq, index) => {
-    // Calculate remaining stock after other borrowItems (excluding this row)
+    
+    const isUsed = borrowItemsList.some(
+      (bItem, idx) => idx !== i && Number(bItem.index) === index
+    );
+    
     const remainingQty = eq.qty - borrowItemsList
-      .filter((bItem, idx) => idx !== i && bItem.index === index)
-      .reduce((sum, bItem) => sum + bItem.qty, 0);
+      .filter((bItem, idx) => idx !== i && Number(bItem.index) === index)
+      .reduce((sum, bItem) => sum + Number(bItem.qty), 0);
     
-    // Disable if already in borrowItemsList (excluding this row) OR no remaining stock
-    const disabled = (borrowItemsList.some((bItem, idx) => idx !== i && bItem.index === index) || remainingQty <= 0) ?
-      'disabled' : '';
+    // ❌ Hide invalid options (except current)
+    if ((isUsed || remainingQty <= 0) && index !== Number(item.index)) return '';
     
-    const selected = index === item.index ? 'selected' : '';
-    return `<option value="${index}" ${selected} ${disabled}>${eq.name} (Available: ${remainingQty})</option>`;
+    const selected = index === Number(item.index) ? 'selected' : '';
+    
+    return `<option value="${index}" ${selected}>
+      ${eq.name} (Available: ${remainingQty})
+    </option>`;
   }).join('');
   
   Swal.fire({
@@ -1026,32 +1088,38 @@ function editBorrowItem(i) {
       <select id="swal-equipment" class="swal2-select" style="width: 100%; margin-bottom: 10px;">
         ${equipmentOptions}
       </select>
+
       <label for="swal-qty">Quantity (1-3):</label>
       <input id="swal-qty" type="number" min="1" max="3" value="${item.qty}" class="swal2-input">
     `,
     showCancelButton: true,
     confirmButtonText: 'Update',
     cancelButtonText: 'Cancel',
+    
     preConfirm: () => {
-      const selectedIndex = parseInt(document.getElementById('swal-equipment').value);
-      const newQty = parseInt(document.getElementById('swal-qty').value);
+      const selectedIndex = Number(document.getElementById('swal-equipment').value);
+      const newQty = Number(document.getElementById('swal-qty').value);
       
-      // Quantity validation: 1 to 3
-      if (isNaN(newQty) || newQty < 1 || newQty > 3) {
+      // ✅ Quantity validation
+      if (!Number.isInteger(newQty) || newQty < 1 || newQty > 3) {
         Swal.showValidationMessage('Quantity must be between 1 and 3.');
         return false;
       }
       
-      // Check if the selected equipment is already in borrow list (excluding this row)
-      if (borrowItemsList.some((bItem, idx) => idx !== i && bItem.index === selectedIndex)) {
-        Swal.showValidationMessage('Cannot update, this equipment is already in the borrow list.');
+      // ✅ Duplicate check (STRICT)
+      const isDuplicate = borrowItemsList.some(
+        (bItem, idx) => idx !== i && Number(bItem.index) === selectedIndex
+      );
+      
+      if (isDuplicate) {
+        Swal.showValidationMessage('Cannot update: already in borrow list.');
         return false;
       }
       
-      // Check stock availability
+      // ✅ Stock check
       const remainingQty = equipment[selectedIndex].qty - borrowItemsList
-        .filter((bItem, idx) => idx !== i && bItem.index === selectedIndex)
-        .reduce((sum, bItem) => sum + bItem.qty, 0);
+        .filter((bItem, idx) => idx !== i && Number(bItem.index) === selectedIndex)
+        .reduce((sum, bItem) => sum + Number(bItem.qty), 0);
       
       if (newQty > remainingQty) {
         Swal.showValidationMessage(`Not enough stock. Available: ${remainingQty}`);
@@ -1060,18 +1128,41 @@ function editBorrowItem(i) {
       
       return { selectedIndex, newQty };
     }
+    
   }).then((result) => {
-    if (result.isConfirmed) {
-      item.index = result.value.selectedIndex;
-      item.qty = result.value.newQty;
-      renderBorrowItems();
-      
+    
+    if (!result.isConfirmed) return;
+    
+    const selectedIndex = Number(result.value.selectedIndex);
+    const newQty = Number(result.value.newQty);
+    
+    // 🔥 FINAL DEFENSE (cannot be bypassed)
+    const isDuplicate = borrowItemsList.some(
+      (bItem, idx) => idx !== i && Number(bItem.index) === selectedIndex
+    );
+    
+    if (isDuplicate) {
       Swal.fire(
-        'Updated!',
-        `Borrowed item updated to ${equipment[item.index].name} (Qty: ${item.qty})`,
-        'success'
+        'Error',
+        'Duplicate equipment detected. Update cancelled.',
+        'error'
       );
+      return;
     }
+    
+    // ✅ SAFE UPDATE (overwrite cleanly)
+    borrowItemsList[i] = {
+      index: selectedIndex,
+      qty: newQty
+    };
+    
+    renderBorrowItems();
+    
+    Swal.fire(
+      'Updated!',
+      `Now: ${equipment[selectedIndex].name} (Qty: ${newQty})`,
+      'success'
+    );
   });
 }
 function removeBorrowItem(i) {
@@ -1107,48 +1198,68 @@ function removeBorrowItem(i) {
 }
 
 function confirmBorrowMultiple() {
-  if(!validateInputs()) return;
-
+  if (!validateInputs()) return;
+  
   let today = new Date().toISOString().split("T")[0];
-
+  
+  // Find today's transaction for this student
+  let todayTransaction = history.find(h =>
+    h.student === studentNumber.value &&
+    h.contact === contactNumber.value &&
+    h.date === today &&
+    h.status === "Borrowed"
+  );
+  
+  // Count current items borrowed today
+  let currentCount = todayTransaction ? todayTransaction.items.reduce((sum, i) => sum + i.qty, 0) : 0;
+  let newItemsCount = borrowItemsList.reduce((sum, i) => sum + i.qty, 0);
+  
+  if (currentCount + newItemsCount > 3) {
+    Swal.fire({
+      icon: "warning",
+      title: "Borrow limit exceeded",
+      text: `You can only borrow ${3 - currentCount} more item(s) today.`,
+    });
+    return;
+  }
+  
+  // Process each item
   borrowItemsList.forEach(item => {
     let eq = equipment[item.index];
-
-    // check existing borrow for same equipment
-    let existing = history.find(h =>
-      h.student === studentNumber.value &&
-      h.equipment === eq.name &&
-      h.status === "Borrowed"
-    );
-
-    if(existing){
-      if(existing.qty + item.qty > eq.qty){
-        Swal.fire({ icon:'error', title:`Not enough stock for ${eq.name}` });
-        return;
+    
+    if (todayTransaction) {
+      // Check if this equipment already exists in items
+      let existingItem = todayTransaction.items.find(i => i.name === eq.name);
+      if (existingItem) {
+        if (existingItem.qty + item.qty > eq.qty) {
+          Swal.fire({ icon: 'error', title: `Not enough stock for ${eq.name}` });
+          return;
+        }
+        existingItem.qty += item.qty;
+      } else {
+        todayTransaction.items.push({ name: eq.name, qty: item.qty });
       }
-      existing.qty += item.qty;
-      existing.due = dueDate.value;
+      todayTransaction.due = dueDate.value; // update due date
     } else {
-      history.push({
-  student: studentNumber.value,
-  name: borrowerName.value,
-  contact: contactNumber.value,
-  items: borrowItemsList.map(item => ({
-    name: equipment[item.index].name,
-    qty: item.qty
-  })),
-  date: today,
-  due: dueDate.value,
-  status: "Borrowed"
-});
+      // No transaction today, create new
+      todayTransaction = {
+        student: studentNumber.value,
+        name: borrowerName.value,
+        contact: contactNumber.value,
+        items: [{ name: eq.name, qty: item.qty }],
+        date: today,
+        due: dueDate.value,
+        status: "Borrowed"
+      };
+      history.push(todayTransaction);
     }
-
+    
     // Deduct from stock
     eq.qty -= item.qty;
   });
-
-  Swal.fire({ icon:'success', title:'Borrowed successfully!', timer:2000, showConfirmButton:false });
-
+  
+  Swal.fire({ icon: 'success', title: 'Borrowed successfully!', timer: 2000, showConfirmButton: false });
+  
   // Clear form
   borrowItemsList = [];
   renderBorrowItems();
@@ -1157,12 +1268,31 @@ function confirmBorrowMultiple() {
   contactNumber.value = "";
   dueDate.value = "";
   borrowEquipment.selectedIndex = 0;
-
+  
   saveData();
 }
 
+function getBorrowedCount(student, contact){
+  let count = 0;
 
+  history.forEach(h => {
+    if (
+      h.student === student &&
+      h.contact === contact &&
+      h.status === "Borrowed"
+    ) {
+      if (h.items) {
+        h.items.forEach(item => {
+          count += item.qty;
+        });
+      } else {
+        count += h.qty || 0;
+      }
+    }
+  });
 
+  return count;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   renderEquipment();
@@ -1171,4 +1301,3 @@ document.addEventListener("DOMContentLoaded", () => {
   updateDashboard();
   renderChart();
 });
-     
