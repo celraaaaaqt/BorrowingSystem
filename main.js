@@ -1,4 +1,4 @@
-let equipment = JSON.parse(localStorage.getItem("equipment")) || [];
+ let equipment = JSON.parse(localStorage.getItem("equipment")) || [];
 let history = JSON.parse(localStorage.getItem("history")) || [];
 let reports = JSON.parse(localStorage.getItem("reports")) || [];
 
@@ -165,32 +165,53 @@ if(!allowedConditions.includes(eqDesc.value)){
   return;
 }
 
-if(confirm(editIndex===-1?"Add this equipment?":"Update this equipment?")){
-
-if(editIndex===-1){
-equipment.push({
-name:eqName.value,
-category:eqCategory.value,
-desc:eqDesc.value,
-qty:quantity
+Swal.fire({
+  title: editIndex === -1 ? 'Add Equipment?' : 'Update Equipment?',
+  text: editIndex === -1 ?
+    'Do you want to add this equipment?' :
+    'Do you want to update this equipment?',
+  icon: 'question',
+  showCancelButton: true,
+  confirmButtonText: 'Yes',
+  cancelButtonText: 'Cancel'
+}).then((result) => {
+  if (result.isConfirmed) {
+    
+    if (editIndex === -1) {
+      equipment.push({
+        name: eqName.value,
+        category: eqCategory.value,
+        desc: eqDesc.value,
+        qty: quantity
+      });
+    } else {
+      equipment[editIndex] = {
+        name: eqName.value,
+        category: eqCategory.value,
+        desc: eqDesc.value,
+        qty: quantity
+      };
+      editIndex = -1;
+      addBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Equipment';
+    }
+    
+    eqName.value = "";
+    eqCategory.value = "";
+    eqDesc.value = "";
+    eqQty.value = "";
+    
+    saveData();
+    
+    Swal.fire({
+      icon: 'success',
+      title: editIndex === -1 ? 'Added!' : 'Updated!',
+      text: editIndex === -1 ?
+        'Equipment has been added successfully.' :
+        'Equipment has been updated successfully.'
+    });
+    
+  }
 });
-}else{
-equipment[editIndex]={
-name:eqName.value,
-category:eqCategory.value,
-desc:eqDesc.value,
-qty:quantity
-};
-editIndex=-1;
-addBtn.innerHTML='<i class="fa-solid fa-plus"></i> Add Equipment';
-}
-
-eqName.value="";
-eqCategory.value="";
-eqDesc.value="";
-eqQty.value="";
-saveData();
-}
 }
 
 function editEquipment(i){
@@ -226,23 +247,34 @@ saveData();
 });
 }
 
-function renderEquipment(){
-equipmentTable.innerHTML="";
-borrowEquipment.innerHTML="";
-equipment.forEach((e,i)=>{
-equipmentTable.innerHTML+=`
-<tr>
-<td>${e.name}</td>
-<td>${e.category}</td>
-<td>${e.desc}</td>
-<td>${e.qty}</td>
-<td>
-<button class="warning" onclick="editEquipment(${i})"><i class="fa-solid fa-pen"></i></button>
-<button class="danger" onclick="deleteEquipment(${i})"><i class="fa-solid fa-trash"></i></button>
-</td>
-</tr>`;
-borrowEquipment.innerHTML+=`<option value="${i}">${e.name} (${e.qty})</option>`;
-});
+function renderEquipment() {
+  equipmentTable.innerHTML = "";
+  
+  // ✅ Add dummy first option
+  borrowEquipment.innerHTML = `<option value="">Select Equipment</option>`;
+  
+  equipment.forEach((e, i) => {
+    equipmentTable.innerHTML += `
+      <tr>
+        <td>${e.name}</td>
+        <td>${e.category}</td>
+        <td>${e.desc}</td>
+        <td>${e.qty}</td>
+        <td>
+          <button class="warning" onclick="editEquipment(${i})"><i class="fa-solid fa-pen"></i></button>
+          <button class="danger" onclick="deleteEquipment(${i})"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>
+    `;
+    
+    borrowEquipment.innerHTML += `<option value="${i}">${e.name} (${e.qty})</option>`;
+  });
+  
+  // Disable qty dropdown initially
+  borrowQty.disabled = true;
+  borrowQty.innerHTML = '<option value="">Select Qty</option>';
+  
+  // updateQtyDropdown() only runs after a real selection
 }
 
 // for search and sorting
@@ -367,12 +399,15 @@ if (currentBorrowed >= 3) {
   });
   return;
 }
-
-if (currentBorrowed + newItemsCount > 3) {
+let remaining = 3 - currentBorrowed;
+if (currentBorrowed > 0 && currentBorrowed + newItemsCount > 3) {
+  
   Swal.fire({
     icon: 'warning',
     title: `Limit exceeded`,
-    text: `Borrower already has ${currentBorrowed}. You can only add ${3 - currentBorrowed} more item(s).`
+    text: currentBorrowed === 0 ?
+  `You can only borrow up to 3 items.` :
+  `Borrower already has ${currentBorrowed} item(s). You can only add ${remaining} more.`
   });
   return;
 }
@@ -529,10 +564,16 @@ function renderHistory() {
     }).flat();
     
     let overallStatus;
-    if (allStatuses.every(s => s === "Returned")) overallStatus = "Returned";
-    else if (allStatuses.every(s => s === "Reported")) overallStatus = "Reported";
-    else if (allStatuses.includes("Borrowed")) overallStatus = "Borrowed";
-    else overallStatus = "Partial";
+
+if (allStatuses.includes("Reported")) {
+  overallStatus = "Reported";
+}
+else if (allStatuses.every(s => s === "Returned")) {
+  overallStatus = "Returned";
+}
+else {
+  overallStatus = "Borrowed";
+}
     
     let first = group[0];
     let overdue = (overallStatus === "Borrowed" && new Date(first.due) < new Date()) ? "overdue" : "";
@@ -558,7 +599,7 @@ function renderHistory() {
         <td>${first.due}</td>
         <td>${overallStatus}</td>
         <td>
-          ${overallStatus === "Borrowed" || overallStatus === "Partial" ? `
+          ${overallStatus === "Borrowed" ? `
           <button class="success" onclick="markReturnedGroup('${first.student}', '${first.date}', '${first.contact}')">
             <i class="fa-solid fa-rotate-left"></i>
           </button>
@@ -579,22 +620,31 @@ function markReturnedGroup(student, date, contact) {
     confirmButtonText: 'Yes, confirm'
   }).then((result) => {
     if (result.isConfirmed) {
-      // Find all history entries for this transaction
+      
       history.forEach(h => {
         if (h.student === student && h.date === date && h.contact === contact) {
-          h.status = "Returned";
           
-          // Restore stock for each item if using multi-item
-          if (h.items) {
+          if (h.items && h.items.length > 0) {
+            
+            // ✅ FIX 1: Update EACH ITEM status
             h.items.forEach(item => {
+              item.status = "Returned";
+              
+              // ✅ Restore stock
               let eq = equipment.find(e => e.name === item.name);
               if (eq) eq.qty += item.qty;
             });
+            
           } else {
-            // Single-item borrow
+            // fallback old structure
+            h.status = "Returned";
+            
             let eq = equipment.find(e => e.name === h.equipment);
             if (eq) eq.qty += h.qty;
           }
+          
+          // ✅ FIX 2: Update overall status
+          h.status = "Returned";
         }
       });
       
@@ -624,37 +674,72 @@ let uniqueTransactions = [
 
 todayCount.innerText = uniqueTransactions.length;
 
-overdueCount.innerText=history.filter(h=>h.status==="Borrowed"&&new Date(h.due)<new Date()).length;
-
+overdueCount.innerText = history.filter(h => {
+  if (h.items) {
+    return h.items.some(item =>
+      (!item.status || item.status === "Borrowed") &&
+      new Date(h.due) < new Date()
+    );
+  }
+  return h.status === "Borrowed" && new Date(h.due) < new Date();
+}).length;
 totalEquipments.innerText = equipment.length;
 }
 
 function logout() {
-    let confirmLogout = confirm("Are you sure you want to log out?");
-    
-    if (confirmLogout) {
+  Swal.fire({
+    title: 'Log out?',
+    text: 'Are you sure you want to log out?',
+    icon: 'warning',
+    confirmButtonText: 'Yes, log out',
+    showCancelButton: true,
+    cancelButtonText: 'Cancel',
+    reverseButtons: true
+  }).then((result) => {
+    if (result.isConfirmed) {
+      
+      // ✅ Optional loading effect
+      Swal.fire({
+        title: 'Logging out...',
+        text: 'Please wait',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+      
+      setTimeout(() => {
         window.location.href = 'login.html';
+      }, 800); // smooth delay
+      
     }
+  });
 }
 
 document.getElementById("logout").onclick = logout;
 
-function getChartData(){
+function getChartData() {
   let borrowed = 0;
   let returned = 0;
   let reported = 0;
   
   history.forEach(h => {
-    if(h.status === "Borrowed")
-    borrowed++;
-    if(h.status === "Returned")
-    returned++;
-    if(h.status === "Reported")
-    reported++;
+    if (h.items && h.items.length > 0) {
+      h.items.forEach(item => {
+        if (!item.status || item.status === "Borrowed") borrowed += item.qty;
+        else if (item.status === "Returned") returned += item.qty;
+        else if (item.status === "Reported") reported += item.qty;
+      });
+    } else {
+      // fallback (old data without item list)
+      if (h.status === "Borrowed") borrowed += 1;
+      else if (h.status === "Returned") returned += 1;
+      else if (h.status === "Reported") reported += 1;
+    }
   });
   
-  return { borrowed, returned, reported};
-  }
+  return { borrowed, returned, reported };
+}
 
 let chart;
 
@@ -670,7 +755,7 @@ function renderChart(){
 chart = new Chart(ctx, {
   type: "bar",
   data: {
-    labels: ['Borrowed', 'Returned', 'Reported'],
+labels: ['Borrowed', 'Returned', 'Reported'],
     datasets: [
   {
     label: 'Borrowed',
@@ -689,8 +774,8 @@ chart = new Chart(ctx, {
   {
   label: 'Reported',
   data: [0, 0, data.reported], // 0 for "Borrowed" bar
-  backgroundColor: 'red',
-  borderColor: '#166534',
+  backgroundColor: '#ef4444',
+  borderColor: 'red',
   borderWidth: 2
 }
 ]
@@ -885,13 +970,24 @@ function reportItemGroup(student, date, contact) {
       // Update the actual history entry/item
       if (histEntry.items && histEntry.items.length > 0) {
         histEntry.items.forEach(item => {
-          if (item.name === h.equipment) {
+          if (item.name.trim().toLowerCase() === h.equipment.trim().toLowerCase()) {
             item.status = r.type ? "Reported" : "Returned";
           }
         });
       } else {
         histEntry.status = r.type ? "Reported" : "Returned";
       }
+      
+      // ✅ update overall status of transaction
+if (histEntry.items) {
+  let statuses = histEntry.items.map(i => i.status);
+  
+  if (statuses.every(s => s === "Returned")) {
+  histEntry.status = "Returned";
+} else {
+  histEntry.status = "Reported";
+}
+}
 
       // Push to reports
       reports.push({
@@ -969,12 +1065,12 @@ let borrowItemsList = []; // stores { index, qty }
 
 function addBorrowItem() {
   let index = Number(borrowEquipment.value);
-  let qty = parseInt(borrowQty.value);
   
-  if (index === "" || isNaN(qty) || qty <= 0) {
-    Swal.fire({ icon: 'warning', title: 'Select equipment and enter valid quantity.' });
-    return;
-  }
+  let qty = parseInt(borrowQty.value);
+if (isNaN(qty) || qty < 1) {
+  Swal.fire({ icon: 'warning', title: 'Please select a quantity.' });
+  return;
+}
   
   // check if already added
   if (borrowItemsList.some(item => item.index == index)) {
@@ -1205,20 +1301,24 @@ function confirmBorrowMultiple() {
   // Find today's transaction for this student
   let todayTransaction = history.find(h =>
     h.student === studentNumber.value &&
-    h.contact === contactNumber.value &&
-    h.date === today &&
-    h.status === "Borrowed"
+    h.date === today
   );
   
-  // Count current items borrowed today
-  let currentCount = todayTransaction ? todayTransaction.items.reduce((sum, i) => sum + i.qty, 0) : 0;
+  // Count current borrowed items (only status === "Borrowed")
+  let currentCount = 0;
+  if (todayTransaction && todayTransaction.items) {
+    currentCount = todayTransaction.items.reduce((sum, item) => {
+      return sum + (item.status === "Borrowed" ? item.qty : 0);
+    }, 0);
+  }
+  
   let newItemsCount = borrowItemsList.reduce((sum, i) => sum + i.qty, 0);
   
   if (currentCount + newItemsCount > 3) {
     Swal.fire({
       icon: "warning",
       title: "Borrow limit exceeded",
-      text: `You can only borrow ${3 - currentCount} more item(s) today.`,
+      text: `You already borrowed ${currentCount} item(s) today. You can only borrow ${3 - currentCount} more item(s). Come back tomorrow for new borrowings.`,
     });
     return;
   }
@@ -1227,34 +1327,35 @@ function confirmBorrowMultiple() {
   borrowItemsList.forEach(item => {
     let eq = equipment[item.index];
     
-    if (todayTransaction) {
-      // Check if this equipment already exists in items
-      let existingItem = todayTransaction.items.find(i => i.name === eq.name);
-      if (existingItem) {
-        if (existingItem.qty + item.qty > eq.qty) {
-          Swal.fire({ icon: 'error', title: `Not enough stock for ${eq.name}` });
-          return;
-        }
-        existingItem.qty += item.qty;
-      } else {
-        todayTransaction.items.push({ name: eq.name, qty: item.qty });
-      }
-      todayTransaction.due = dueDate.value; // update due date
-    } else {
-      // No transaction today, create new
+    if (item.qty > eq.qty) {
+      Swal.fire({ icon: 'error', title: `Not enough stock for ${eq.name}` });
+      return;
+    }
+    
+    if (!todayTransaction) {
+      // No transaction today, create a new one
       todayTransaction = {
         student: studentNumber.value,
         name: borrowerName.value,
         contact: contactNumber.value,
-        items: [{ name: eq.name, qty: item.qty }],
+        items: [{ name: eq.name, qty: item.qty, status: "Borrowed" }],
         date: today,
         due: dueDate.value,
         status: "Borrowed"
       };
       history.push(todayTransaction);
+    } else {
+      // Transaction exists, add or update item
+      let existingItem = todayTransaction.items.find(i => i.name === eq.name && i.status === "Borrowed");
+      if (existingItem) {
+        existingItem.qty += item.qty; // increase quantity of same product
+      } else {
+        todayTransaction.items.push({ name: eq.name, qty: item.qty, status: "Borrowed" });
+      }
+      todayTransaction.due = dueDate.value; // update due date
     }
     
-    // Deduct from stock
+    // Deduct stock
     eq.qty -= item.qty;
   });
   
@@ -1272,26 +1373,75 @@ function confirmBorrowMultiple() {
   saveData();
 }
 
-function getBorrowedCount(student, contact){
+function getBorrowedCount(student, contact) {
   let count = 0;
-
+  
   history.forEach(h => {
-    if (
-      h.student === student &&
-      h.contact === contact &&
-      h.status === "Borrowed"
-    ) {
-      if (h.items) {
+    if (h.student === student && h.contact === contact) {
+      
+      if (h.items && h.items.length > 0) {
+        // ✅ Count ONLY items still Borrowed
         h.items.forEach(item => {
-          count += item.qty;
+          if (!item.status || item.status === "Borrowed") {
+            count += item.qty;
+          }
         });
+        
       } else {
-        count += h.qty || 0;
+        // fallback (old structure)
+        if (h.status === "Borrowed") {
+          count += h.qty || 0;
+        }
       }
+      
     }
   });
-
+  
   return count;
+}
+
+function updateQtyDropdown() {
+  const eqSelect = document.getElementById("borrowEquipment");
+  const qtySelect = document.getElementById("borrowQty");
+  const index = eqSelect.selectedIndex - 1; // first option is "Select Equipment"
+  
+  if (index < 0) {
+    qtySelect.innerHTML = '<option value="">Select Qty</option>';
+    qtySelect.disabled = true;
+    return;
+  }
+  
+  const stock = equipment[index].qty;
+  
+  if (stock === 0) {
+    qtySelect.innerHTML = '<option value="">Out of stock</option>';
+    qtySelect.disabled = true;
+    return;
+  }
+  
+  qtySelect.disabled = false;
+  qtySelect.innerHTML = "";
+  
+  const maxQty = Math.min(3, stock);
+  
+  for (let i = 1; i <= maxQty; i++) {
+    const option = document.createElement("option");
+    option.value = i;
+    option.textContent = i;
+    qtySelect.appendChild(option);
+  }
+  
+  if (stock < 3) {
+    Swal.fire({
+      icon: "warning",
+      title: "Limited Stock",
+      text: `Only ${stock} item(s) available for this equipment.`,
+      toast: true,
+      position: "top-end",
+      timer: 2000,
+      showConfirmButton: false
+    });
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1300,4 +1450,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderReports();
   updateDashboard();
   renderChart();
+  
 });
+
+    
